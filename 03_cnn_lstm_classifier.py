@@ -298,7 +298,7 @@ def train(model, train_loader, val_loader, pos_weights):
                             weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", factor=0.5,
-        patience=LR_PATIENCE, verbose=True
+        patience=LR_PATIENCE
     )
     scaler = torch.cuda.amp.GradScaler(enabled=DEVICE.type == "cuda")
 

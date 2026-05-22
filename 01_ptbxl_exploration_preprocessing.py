@@ -20,7 +20,7 @@ import scipy.signal as sig
 from collections import Counter
 
 # ── 0. CONFIG ─────────────────────────────────────────────────
-BASE_PATH   = "/kaggle/input/ptb-xl-dataset"   # change if local
+BASE_PATH   = "./datasets/ptb-xl-dataset"   # change if local
 SAMPLING_HZ = 100          # PTB-XL has 100 Hz and 500 Hz; 100 is fine for classification
 LEADS       = ['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6']
 SUPERCLASS_MAP = {

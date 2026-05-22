@@ -17,7 +17,7 @@ import scipy.signal as sig
 import scipy.io as sio
 import wfdb
 
-BASE_PATH  = "/kaggle/input/bidmc-ppg-dataset"
+BASE_PATH  = "./datasets/bidmc-ppg-dataset"
 OUTPUT_DIR = "./outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -76,10 +76,16 @@ def load_bidmc_subject(subject_id, base_path):
     # ── Numeric parameters (1 Hz) ───────────────────────────
     rec_num = wfdb.rdrecord(prefix + "n")
     nums    = rec_num.p_signal.astype(np.float32)
-    num_names = rec_num.sig_name
+    
+    # FIX: Strip commas and whitespace from the raw signal names
+    raw_names = rec_num.sig_name
+    num_names = [name.replace(',', '').strip() for name in raw_names]
+
+    print(f"Available numeric channels: {num_names}")
 
     def get_num(name):
         if name in num_names:
+            # We must use the index of the cleaned name to grab the column
             return nums[:, num_names.index(name)]
         return np.full(nums.shape[0], np.nan)
 
@@ -111,8 +117,11 @@ print(f"\nNumeric parameters (mean ± std):")
 for name, arr in [("HR (bpm)", subj["hr"]), ("SpO2 (%)", subj["spo2"]),
                   ("RR (br/min)", subj["rr"]), ("PR (bpm)", subj["pr"])]:
     valid = arr[~np.isnan(arr)]
-    print(f"  {name:15s}: {valid.mean():.1f} ± {valid.std():.1f}  "
-          f"[{valid.min():.1f} – {valid.max():.1f}]")
+    if valid.size > 0:
+        print(f"  {name:15s}: {valid.mean():.1f} ± {valid.std():.1f}  "
+              f"[{valid.min():.1f} – {valid.max():.1f}]")
+    else:
+        print(f"  {name:15s}: No valid data found.")
 
 
 # =============================================================
@@ -189,9 +198,15 @@ def clean_numerics(arr, min_val, max_val):
     """Replace physiologically impossible values with NaN, then interpolate."""
     arr = arr.copy().astype(float)
     arr[(arr < min_val) | (arr > max_val)] = np.nan
-    # Linear interpolation for short gaps
+    
+    # Check if all values are NaN
+    if np.isnan(arr).all():
+        return arr # Or handle as needed (e.g., return a zero-filled array)
+        
     s = pd.Series(arr)
-    arr = s.interpolate(method='linear', limit=10).values
+    # Ensure at least one valid value exists to interpolate
+    if s.notna().any():
+        arr = s.interpolate(method='linear', limit=10).fillna(method='bfill').fillna(method='ffill').values
     return arr
 
 ecg_clean  = preprocess_ecg_bidmc(subj["ecg"],  fs=FS_SIGNAL)
@@ -229,9 +244,12 @@ print("=" * 60)
 
 # These thresholds are standard clinical reference ranges
 THRESHOLDS = {
-    "hr":   {"low": 60, "high": 100, "unit": "bpm"},
-    "spo2": {"low": 94, "high": 100, "unit": "%"},
-    "rr":   {"low": 12, "high": 20,  "unit": "br/min"},
+    # "hr":   {"low": 60, "high": 100, "unit": "bpm"},
+    # "spo2": {"low": 94, "high": 100, "unit": "%"},
+    # "rr":   {"low": 12, "high": 20,  "unit": "br/min"},
+    "hr":   {"low": 60, "high": 100},
+    "spo2": {"low": 94, "high": 100},
+    "rr":   {"low": 12, "high": 20},
 }
 
 def classify_param(value, low, high):
